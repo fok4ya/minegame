@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+    var config = {
+        type: Phaser.AUTO,
+        width: 1920,
+        height: 1080,
+        clearBeforeRender: true,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                fps: 30
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    var game = new Phaser.Game(config);
+
+    // Global variables that don't need to be changed
+    var width = 1920;
+    var height = 1080;
+    var panx = 0;
+    var pany = 0;
+    var cubeScale = 0.15;
+    var cubeScaleIncrement = 0.05;
+    var cubeWidth = 680 * cubeScale;
+    var cubeHeight = 740 * cubeScale;
+    var jsonData; // Global variable to store JSON data
+
+    function preload() {
+        this.load.image('background', './assets/background.png');
+        this.load.image('grass', './assets/grass.png');
+        this.load.image('stone', './assets/stone.png');
+        this.load.image('glass', './assets/glass.png');
+    }
+
+    function create() {
+        scaleText = this.add.text(10, 10, 'Cube Scale: ' + cubeScale, { fontSize: '24px', fill: '#fff' });
+        const keys = ['UP', 'LEFT', 'DOWN', 'RIGHT', 'MINUS', 'PLUS'];
+        keys.forEach(key => {
+            this.input.keyboard.on(`keydown_${key}`, panning);
+        });
+
+        // Load JSON data once and store it in the global variable
+        fetch('./world.json')
+            .then(response => response.json())
+            .then(data => {
+                jsonData = data;
+            })
+            .catch(error => console.error('Error reading the JSON file:', error));
+    }
+
+    function update() {
+        this.children.removeAll(true);
+        const background = this.add.image(960, 540, 'background');
+        if (!jsonData) {
+            // JSON data is not loaded yet
+            return;
+        }
+
+        var cubeWidth = 680 * cubeScale;
+        var cubeHeight = 740 * cubeScale;
+
+        const startX = width / 2 + panx;
+        const startY = height / 2 + pany;
+
+        jsonData.world.blocks.forEach(block => {
+            // Calculate the position in isometric space with the offset
+            const isoX = startX + block.x * (cubeWidth / 2) - block.z * (cubeWidth / 2);
+            const isoY = startY + block.x * (cubeHeight / 4) + block.z * (cubeHeight / 4) - (block.y * (cubeHeight / 2));
+
+            // Create a cube at the calculated position
+            const cube = this.add.image(isoX, isoY, block.type);
+
+            // Set the scale to make it two times bigger
+            cube.setScale(cubeScale);
+        });
+    }
+
+    function panning(event) {
+        var cubeWidth = 680 * cubeScale;
+        var cubeHeight = 740 * cubeScale;
+        switch (event.keyCode) {
+            case Phaser.Input.Keyboard.KeyCodes.UP: pany -= cubeHeight; break;
+            case Phaser.Input.Keyboard.KeyCodes.LEFT: panx -= cubeWidth; break;
+            case Phaser.Input.Keyboard.KeyCodes.DOWN: pany += cubeHeight; break;
+            case Phaser.Input.Keyboard.KeyCodes.RIGHT: panx += cubeWidth; break;
+            case Phaser.Input.Keyboard.KeyCodes.MINUS: if (cubeScale > 0.10) {cubeScale -= cubeScaleIncrement} else {cubeScale = 0.05}; break;
+            case Phaser.Input.Keyboard.KeyCodes.PLUS: cubeScale += cubeScaleIncrement; break;
+        }
+    }
+
+</script>
+
+</body>
+</html>
