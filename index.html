@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style type="text/css">
         body {
             margin: 0;
@@ -11,17 +13,19 @@
 </head>
 <body>
 
+<input type="file" id="fileInput" accept=".json" />
+
 <script type="text/javascript">
 
     var config = {
         type: Phaser.AUTO,
-        width: 1920,
-        height: 1080,
+        width: window.innerWidth,
+        height: window.innerHeight,
         clearBeforeRender: true,
         physics: {
             default: 'arcade',
             arcade: {
-                fps: 30
+                fps: 60
             }
         },
         scene: {
@@ -34,8 +38,9 @@
     var game = new Phaser.Game(config);
 
     // Global variables that don't need to be changed
-    var width = 1920;
-    var height = 1080;
+    var selectorX = 0;
+    var selectorY = 0;
+    var selectorZ = 0;
     var panx = 0;
     var pany = 0;
     var cubeScale = 0.15;
@@ -44,7 +49,14 @@
     var cubeHeight = 740 * cubeScale;
     var jsonData; // Global variable to store JSON data
 
+    window.addEventListener('resize', function () {
+        game.resize(window.innerWidth, window.innerHeight);
+        resize();
+    });
+
     function preload() {
+        this.load.image('saveButton', './assets/save.png');
+        this.load.spritesheet('selector', './assets/selector_sheet.png', { frameWidth: 680, frameHeight: 740, startframe: 0, endframe: 15 });
         this.load.image('background', './assets/background.png');
         this.load.image('grass', './assets/grass.png');
         this.load.image('stone', './assets/stone.png');
@@ -53,25 +65,35 @@
 
     function create() {
         scaleText = this.add.text(10, 10, 'Cube Scale: ' + cubeScale, { fontSize: '24px', fill: '#fff' });
-        const keys = ['UP', 'LEFT', 'DOWN', 'RIGHT', 'MINUS', 'PLUS'];
+        const keys = ['UP', 'LEFT', 'DOWN', 'RIGHT', 'MINUS', 'PLUS', 'W', 'A', 'S', 'D', 'Q', 'E', 'SPACE'];
         keys.forEach(key => {
-            this.input.keyboard.on(`keydown_${key}`, panning);
+            this.input.keyboard.on(`keydown_${key}`, keyevents);
         });
 
-        // Load JSON data once and store it in the global variable
+        // Load default JSON data or initialize an empty object
+            jsonData = { world: { blocks: [] } };
+
+        // Load JSON data from the default file
         fetch('./world.json')
             .then(response => response.json())
             .then(data => {
                 jsonData = data;
             })
             .catch(error => console.error('Error reading the JSON file:', error));
+        
+        // Set up file input event listener
+        const fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', handleFileSelect);
+
+        resize();
     }
 
-    function update() {
+    function update() {   
+    var width = window.innerWidth;
+    var height = window.innerHeight;
         this.children.removeAll(true);
         const background = this.add.image(960, 540, 'background');
         if (!jsonData) {
-            // JSON data is not loaded yet
             return;
         }
 
@@ -92,20 +114,189 @@
             // Set the scale to make it two times bigger
             cube.setScale(cubeScale);
         });
+
+        if (selectorX >= selectorY && selectorX >= selectorZ) {
+            selectorFrame = selectorX;
+        } else if (selectorY >= selectorX && selectorX >= selectorZ) {
+            selectorFrame = selectorY;
+        } else {
+            selectorFrame = selectorZ;
+        };
+
+        const isoX = startX + selectorX * (cubeWidth / 2) - selectorZ * (cubeWidth / 2);
+        const isoY = startY + selectorX * (cubeHeight / 4) + selectorZ * (cubeHeight / 4) - (selectorY * (cubeHeight / 2));
+
+        const selector = this.add.image(isoX, isoY, 'selector', (15-selectorFrame));
+
+        selector.setScale(cubeScale);
+
+        this.add.text(0, 0, `X:${selectorX}, Y:${selectorY}, Z:${selectorZ}`, {
+            fontFamily: 'PixelatedFont, Georgia, "Goudy Bookletter 1911", Times, serif',
+            fontSize: 24,
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+
+        save = this.add.image(width - 50, 50, 'saveButton').setInteractive();
+        save.setScale(0.1);
+        save.on('pointerdown', saveWorld);
     }
 
-    function panning(event) {
+    function resize() {
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+
+        game.scene.scenes.forEach(function(scene) {
+            scene.cameras.main.setSize(width, height);
+        });
+    }
+
+    function keyevents(event) {
         var cubeWidth = 680 * cubeScale;
         var cubeHeight = 740 * cubeScale;
         switch (event.keyCode) {
-            case Phaser.Input.Keyboard.KeyCodes.UP: pany -= cubeHeight; break;
-            case Phaser.Input.Keyboard.KeyCodes.LEFT: panx -= cubeWidth; break;
-            case Phaser.Input.Keyboard.KeyCodes.DOWN: pany += cubeHeight; break;
-            case Phaser.Input.Keyboard.KeyCodes.RIGHT: panx += cubeWidth; break;
+            case Phaser.Input.Keyboard.KeyCodes.UP: pany += cubeHeight; break;
+            case Phaser.Input.Keyboard.KeyCodes.LEFT: panx += cubeWidth; break;
+            case Phaser.Input.Keyboard.KeyCodes.DOWN: pany -= cubeHeight; break;
+            case Phaser.Input.Keyboard.KeyCodes.RIGHT: panx -= cubeWidth; break;
             case Phaser.Input.Keyboard.KeyCodes.MINUS: if (cubeScale > 0.10) {cubeScale -= cubeScaleIncrement} else {cubeScale = 0.05}; break;
             case Phaser.Input.Keyboard.KeyCodes.PLUS: cubeScale += cubeScaleIncrement; break;
+            case Phaser.Input.Keyboard.KeyCodes.W: if (selectorY < 15) {selectorY += 1} else {selectorY = 15}; break;
+            case Phaser.Input.Keyboard.KeyCodes.A: if (selectorZ < 15) {selectorZ += 1} else {selectorZ = 15}; break;
+            case Phaser.Input.Keyboard.KeyCodes.S: if (selectorY > 1) {selectorY -= 1} else {selectorY = 0}; break;
+            case Phaser.Input.Keyboard.KeyCodes.D: if (selectorX < 15) {selectorX += 1} else {selectorX = 15}; break;
+            case Phaser.Input.Keyboard.KeyCodes.Q: if (selectorX > 1) {selectorX -= 1} else {selectorX = 0}; break;
+            case Phaser.Input.Keyboard.KeyCodes.E: if (selectorZ > 1) {selectorZ -= 1} else {selectorZ = 0}; break;
+            case Phaser.Input.Keyboard.KeyCodes.SPACE: placeBlock(); break;
         }
     }
+
+    function placeBlock() {
+    // Place a block at the current selector position
+    if (jsonData) {
+        // Check if the block already exists at the specified coordinates
+        const blockExists = jsonData.world.blocks.some(block => block.x === selectorX && block.y === selectorY && block.z === selectorZ);
+
+        // If the block exists, return without adding a new block
+        if (blockExists) {
+            return;
+        }
+    
+        // If the block doesn't exist, add a new block
+        jsonData.world.blocks.push({
+            x: selectorX,
+            y: selectorY,
+            z: selectorZ,
+            type: 'grass' // Replace with the desired block type
+        });
+
+        // Sort the blocks using a custom sorting function
+        jsonData.world.blocks.sort((a, b) => {
+            if (a.y === b.y) {
+                if (a.x === b.x) {
+                    return a.z - b.z; // Sort by 'z' if 'x' is the same
+                }
+                return a.x - b.x;
+            }
+            return a.y - b.y;
+        });
+
+        // Update the scene with the new block
+        updateScene();
+    }
+}
+
+
+function updateScene() {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    game.scene.scenes.forEach(function(scene) {
+        scene.children.removeAll(true);
+
+        const background = scene.add.image(960, 540, 'background');
+        
+        if (!jsonData) {
+            return;
+        }
+
+        var cubeWidth = 680 * cubeScale;
+        var cubeHeight = 740 * cubeScale;
+
+        const startX = width / 2 + panx;
+        const startY = height / 2 + pany;
+
+        jsonData.world.blocks.forEach(block => {
+            // Calculate the position in isometric space with the offset
+            const isoX = startX + block.x * (cubeWidth / 2) - block.z * (cubeWidth / 2);
+            const isoY = startY + block.x * (cubeHeight / 4) + block.z * (cubeHeight / 4) - (block.y * (cubeHeight / 2));
+
+            // Create a cube at the calculated position
+            const cube = scene.add.image(isoX, isoY, block.type);
+
+            // Set the scale to make it two times bigger
+            cube.setScale(cubeScale);
+        });
+
+        if (selectorX >= selectorY && selectorX >= selectorZ) {
+            selectorFrame = selectorX;
+        } else if (selectorY >= selectorX && selectorX >= selectorZ) {
+            selectorFrame = selectorY;
+        } else {
+            selectorFrame = selectorZ;
+        }
+
+        const isoX = startX + selectorX * (cubeWidth / 2) - selectorZ * (cubeWidth / 2);
+        const isoY = startY + selectorX * (cubeHeight / 4) + selectorZ * (cubeHeight / 4) - (selectorY * (cubeHeight / 2));
+
+        const selector = scene.add.image(isoX, isoY, 'selector', (15 - selectorFrame));
+
+        selector.setScale(cubeScale);
+
+        scene.add.text(0, 0, `X:${selectorX}, Y:${selectorY}, Z:${selectorZ}`, {
+            fontFamily: 'PixelatedFont, Georgia, "Goudy Bookletter 1911", Times, serif',
+            fontSize: 24,
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+
+        const save = scene.add.image(width - 50, 50, 'saveButton').setInteractive();
+        save.setScale(0.1);
+        save.on('pointerdown', saveWorld);
+    });
+}
+
+    function saveWorld() {
+      if (jsonData) {
+        // Convert JSON data to a Blob
+        const blob = new Blob([JSON.stringify(jsonData)], { type: 'application/json' });
+    
+        // Use FileSaver.js to save the Blob as a file
+        saveAs(blob, 'world.json');
+    
+        console.log('World saved successfully');
+      }
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+
+        if (file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    // Parse the JSON data from the file
+                    jsonData = JSON.parse(e.target.result);
+                    console.log('World file loaded successfully');
+                } catch (error) {
+                    console.error('Error parsing the world file:', error);
+                }
+            };
+
+            reader.readAsText(file);
+        }
+    }
+
 
 </script>
 
