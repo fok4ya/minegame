@@ -55,6 +55,7 @@
     var cubeScaleIncrement = 0.05;
     var cubeWidth = 680 * cubeScale;
     var cubeHeight = 740 * cubeScale;
+    var buttons = [];
     var selectedBlock = 'grass';
     var jsonData; // Global variable to store JSON data
 
@@ -86,6 +87,8 @@
 
         const fileInput = document.getElementById('fileInput');
         fileInput.addEventListener('change', handleFileSelect);
+        // Add this line to remove the variable when it's no longer needed
+        fileInput.removeEventListener('change', handleFileSelect);
 
         // Load JSON data from the default file
         fetch('./world.json')
@@ -99,7 +102,13 @@
     }
 
     function update() {
-        this.children.removeAll(true);
+        game.scene.scenes.forEach(function(scene) {
+            scene.children.each(child => {
+                child.destroy();
+            });
+            fileInput.removeEventListener('change', handleFileSelect);
+            scaleText.destroy();
+        });
 
         var width = window.innerWidth;
         var height = window.innerHeight;
@@ -155,7 +164,6 @@
         save.on('pointerdown', saveWorld);
 
         ['grass', 'stone', 'oak_planks', 'oak_log', 'cobblestone', 'glass'].forEach((block, index) => {
-            let buttons = {};
 
             buttons[`${block}Button`] = this.add.image(50, 100 + (index * 75), block).setInteractive();
             buttons[`${block}Button`].setScale(0.1);
@@ -223,9 +231,6 @@
             }
             return a.y - b.y;
         });
-
-        // Update the scene with the new block
-        updateScene();
     }
 }
 
@@ -242,69 +247,10 @@ function removeBlock() {
         if (blockIndex !== -1) {
             console.log('Block found, removing...');
             jsonData.world.blocks.splice(blockIndex, 1);
-            updateScene();
         } else {
             console.log('Block not found.');
         }
     }
-}
-
-function updateScene() {
-    var width = window.innerWidth;
-    var height = window.innerHeight;
-    game.scene.scenes.forEach(function(scene) {
-        scene.children.removeAll(true);
-
-        const background = scene.add.image(960, 540, 'background');
-        
-        if (!jsonData) {
-            return;
-        }
-
-        var cubeWidth = 680 * cubeScale;
-        var cubeHeight = 740 * cubeScale;
-
-        const startX = width / 2 + panx;
-        const startY = height / 2 + pany;
-
-        jsonData.world.blocks.forEach(block => {
-            // Calculate the position in isometric space with the offset
-            const isoX = startX + block.x * (cubeWidth / 2) - block.z * (cubeWidth / 2);
-            const isoY = startY + block.x * (cubeHeight / 4) + block.z * (cubeHeight / 4) - (block.y * (cubeHeight / 2));
-
-            // Create a cube at the calculated position
-            const cube = scene.add.image(isoX, isoY, block.type);
-
-            // Set the scale to make it two times bigger
-            cube.setScale(cubeScale);
-        });
-
-        if (selectorX >= selectorY && selectorX >= selectorZ) {
-            selectorFrame = selectorX;
-        } else if (selectorY >= selectorX && selectorX >= selectorZ) {
-            selectorFrame = selectorY;
-        } else {
-            selectorFrame = selectorZ;
-        }
-
-        const isoX = startX + selectorX * (cubeWidth / 2) - selectorZ * (cubeWidth / 2);
-        const isoY = startY + selectorX * (cubeHeight / 4) + selectorZ * (cubeHeight / 4) - (selectorY * (cubeHeight / 2));
-
-        const selector = scene.add.image(isoX, isoY, 'selector', (15 - selectorFrame));
-
-        selector.setScale(cubeScale);
-
-        scene.add.text(0, 0, `X:${selectorX}, Y:${selectorY}, Z:${selectorZ}`, {
-            fontFamily: 'PixelatedFont, Georgia, "Goudy Bookletter 1911", Times, serif',
-            fontSize: 24,
-            stroke: '#000000',
-            strokeThickness: 4
-        });
-
-        const save = scene.add.image(width - 50, 50, 'saveButton').setInteractive();
-        save.setScale(0.1);
-        save.on('pointerdown', saveWorld);
-    });
 }
 
     function saveWorld() {
