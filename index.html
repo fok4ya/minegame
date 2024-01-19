@@ -27,8 +27,8 @@
 
     var config = {
         type: Phaser.AUTO,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: 1920,
+        height: 1080,
         clearBeforeRender: true,
         physics: {
             default: 'arcade',
@@ -55,6 +55,7 @@
     var cubeScaleIncrement = 0.05;
     var cubeWidth = 680 * cubeScale;
     var cubeHeight = 740 * cubeScale;
+    var selectedBlock = 'grass';
     var jsonData; // Global variable to store JSON data
 
     window.addEventListener('resize', function () {
@@ -67,6 +68,9 @@
         this.load.image('background', './assets/background.png');
         this.load.image('grass', './assets/grass.png');
         this.load.image('stone', './assets/stone.png');
+        this.load.image('oak_planks', './assets/oak_planks.png');
+        this.load.image('oak_log', './assets/oak_log.png');
+        this.load.image('cobblestone', './assets/cobblestone.png');
         this.load.image('glass', './assets/glass.png');
     }
 
@@ -150,6 +154,17 @@
         save.setScale(0.1);
         save.on('pointerdown', saveWorld);
 
+        ['grass', 'stone', 'oak_planks', 'oak_log', 'cobblestone', 'glass'].forEach((block, index) => {
+            let buttons = {};
+
+            buttons[`${block}Button`] = this.add.image(50, 100 + (index * 75), block).setInteractive();
+            buttons[`${block}Button`].setScale(0.1);
+
+            buttons[`${block}Button`].on('pointerdown', () => {
+                selectedBlock = block;
+            });
+        });
+
         resize();
     }
 
@@ -195,7 +210,7 @@
             x: selectorX,
             y: selectorY,
             z: selectorZ,
-            type: 'grass' // Replace with the desired block type
+            type: selectedBlock // Replace with the desired block type
         });
 
         // Sort the blocks using a custom sorting function
