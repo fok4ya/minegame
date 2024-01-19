@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <style type="text/css">
         body {
             margin: 0;
+            overflow: hidden;
+        }
+    
+        #game-container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: absolute;
         }
     </style>
 </head>
 <body>
 
 <input type="file" id="fileInput" accept=".json" />
-
+<div id="game-container">
 <script type="text/javascript">
 
     var config = {
@@ -50,7 +58,6 @@
     var jsonData; // Global variable to store JSON data
 
     window.addEventListener('resize', function () {
-        game.resize(window.innerWidth, window.innerHeight);
         resize();
     });
 
@@ -64,14 +71,17 @@
     }
 
     function create() {
+        game.canvas.focus();
+
+        this.input.keyboard.on('keydown', keyevents);
+        
         scaleText = this.add.text(10, 10, 'Cube Scale: ' + cubeScale, { fontSize: '24px', fill: '#fff' });
-        const keys = ['UP', 'LEFT', 'DOWN', 'RIGHT', 'MINUS', 'PLUS', 'W', 'A', 'S', 'D', 'Q', 'E', 'SPACE'];
-        keys.forEach(key => {
-            this.input.keyboard.on(`keydown_${key}`, keyevents);
-        });
 
         // Load default JSON data or initialize an empty object
             jsonData = { world: { blocks: [] } };
+
+        const fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', handleFileSelect);
 
         // Load JSON data from the default file
         fetch('./world.json')
@@ -82,17 +92,16 @@
             .catch(error => console.error('Error reading the JSON file:', error));
         
         // Set up file input event listener
-        const fileInput = document.getElementById('fileInput');
-        fileInput.addEventListener('change', handleFileSelect);
-
-        resize();
     }
 
-    function update() {   
-    var width = window.innerWidth;
-    var height = window.innerHeight;
+    function update() {
         this.children.removeAll(true);
+
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+
         const background = this.add.image(960, 540, 'background');
+
         if (!jsonData) {
             return;
         }
@@ -140,20 +149,18 @@
         save = this.add.image(width - 50, 50, 'saveButton').setInteractive();
         save.setScale(0.1);
         save.on('pointerdown', saveWorld);
+
+        resize();
     }
 
     function resize() {
-        var width = window.innerWidth;
-        var height = window.innerHeight;
-
         game.scene.scenes.forEach(function(scene) {
-            scene.cameras.main.setSize(width, height);
+            scene.cameras.main.setSize(window.innerWidth, window.innerHeight);
         });
     }
 
     function keyevents(event) {
-        var cubeWidth = 680 * cubeScale;
-        var cubeHeight = 740 * cubeScale;
+        console.log('key pressed')
         switch (event.keyCode) {
             case Phaser.Input.Keyboard.KeyCodes.UP: pany += cubeHeight; break;
             case Phaser.Input.Keyboard.KeyCodes.LEFT: panx += cubeWidth; break;
@@ -168,6 +175,7 @@
             case Phaser.Input.Keyboard.KeyCodes.Q: if (selectorX > 1) {selectorX -= 1} else {selectorX = 0}; break;
             case Phaser.Input.Keyboard.KeyCodes.E: if (selectorZ > 1) {selectorZ -= 1} else {selectorZ = 0}; break;
             case Phaser.Input.Keyboard.KeyCodes.SPACE: placeBlock(); break;
+            case Phaser.Input.Keyboard.KeyCodes.B: removeBlock(); break;
         }
     }
 
@@ -206,6 +214,25 @@
     }
 }
 
+function removeBlock() {
+    console.log('Removing block...');
+    if (jsonData) {
+        // Find the index of the block at the current selector position
+        const blockIndex = jsonData.world.blocks.findIndex(
+            (block) =>
+                block.x === selectorX && block.y === selectorY && block.z === selectorZ
+        );
+
+        // If the block exists, remove it
+        if (blockIndex !== -1) {
+            console.log('Block found, removing...');
+            jsonData.world.blocks.splice(blockIndex, 1);
+            updateScene();
+        } else {
+            console.log('Block not found.');
+        }
+    }
+}
 
 function updateScene() {
     var width = window.innerWidth;
@@ -299,6 +326,7 @@ function updateScene() {
 
 
 </script>
+</div>
 
 </body>
 </html>
